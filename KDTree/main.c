@@ -1,177 +1,11 @@
 // =============================================================================
-// KD-Tree Visualizador - GTK C (Versión limpia y funcional)
+// KD-Tree Visualizador - GTK C (Versión modular)
 // =============================================================================
 
 #include <gtk/gtk.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
-
-// =============================================================================
-// Estructuras del KD-Tree
-// =============================================================================
-typedef struct {
-    int x, y;
-} Punto;
-
-typedef struct Nodo {
-    Punto P;
-    int eje;
-    struct Nodo *Izq, *Der;
-} Nodo;
-
-typedef struct {
-    Nodo *Raiz;
-    int cantidad;
-} KDTree;
-
-// =============================================================================
-// Funciones del KD-Tree
-// =============================================================================
-void Inicializar(KDTree *A) {
-    A->Raiz = NULL;
-    A->cantidad = 0;
-}
-
-void Ins(Punto PP, Nodo **R, int e) {
-    if (*R == NULL) {
-        *R = (Nodo *)malloc(sizeof(Nodo));
-        (*R)->P = PP;
-        (*R)->eje = e;
-        (*R)->Izq = NULL;
-        (*R)->Der = NULL;
-    } else {
-        if ((*R)->eje == 0) {
-            if (PP.x < (*R)->P.x)
-                Ins(PP, &(*R)->Izq, 1);
-            else
-                Ins(PP, &(*R)->Der, 1);
-        } else {
-            if (PP.y < (*R)->P.y)
-                Ins(PP, &(*R)->Izq, 0);
-            else
-                Ins(PP, &(*R)->Der, 0);
-        }
-    }
-}
-
-void Insertar(KDTree *A, Punto PP) {
-    Ins(PP, &A->Raiz, 0);
-    A->cantidad++;
-}
-
-void LiberarArbol(Nodo *R) {
-    if (R == NULL) return;
-    LiberarArbol(R->Izq);
-    LiberarArbol(R->Der);
-    free(R);
-}
-
-// =============================================================================
-// Funciones de dibujo (separadas, no anidadas)
-// =============================================================================
-void DibujarNodo(cairo_t *cr, int xi, int yi, int xf, int yf, Nodo *R) {
-    if (R == NULL) return;
-    
-    int xx = R->P.x;
-    int yy = R->P.y;
-    
-    // Línea divisora
-    cairo_set_source_rgb(cr, 0.2, 0.4, 1);
-    cairo_set_line_width(cr, 1);
-    
-    if (R->eje == 1) {
-        cairo_move_to(cr, xi, yy);
-        cairo_line_to(cr, xf, yy);
-    } else {
-        cairo_move_to(cr, xx, yi);
-        cairo_line_to(cr, xx, yf);
-    }
-    cairo_stroke(cr);
-    
-    // Punto
-    cairo_set_source_rgb(cr, 1, 0, 0);
-    cairo_arc(cr, xx, yy, 4, 0, 2 * G_PI);
-    cairo_fill(cr);
-    
-    // Continuar con hijos
-    if (R->eje == 0) {
-        DibujarNodo(cr, xi, yi, xx, yf, R->Izq);
-        DibujarNodo(cr, xx, yi, xf, yf, R->Der);
-    } else {
-        DibujarNodo(cr, xi, yi, xf, yy, R->Izq);
-        DibujarNodo(cr, xi, yy, xf, yf, R->Der);
-    }
-}
-
-// =============================================================================
-// Funciones aux para calcular ancho del subtree
-// =============================================================================
-int AnchoSubtree(Nodo *n) {
-    if (n == NULL) return 0;
-    if (n->Izq == NULL && n->Der == NULL) return 60;
-    
-    int izq = AnchoSubtree(n->Izq);
-    int der = AnchoSubtree(n->Der);
-    
-    // El ancho es la suma de los anchos de hijos + espacio para este nodo
-    return izq + der + 60;
-}
-
-int AlturaArbol(Nodo *n) {
-    if (n == NULL) return 0;
-    int izq = AlturaArbol(n->Izq);
-    int der = AlturaArbol(n->Der);
-    return 1 + (izq > der ? izq : der);
-}
-
-void DibujarArbolVisual(cairo_t *cr, Nodo *R, int x, int y, int nivel, int maxNivel) {
-    if (R == NULL) return;
-    
-    // El espaciado se reduce en cada nivel (factor de 2)
-    int espaciado = 180 >> nivel;
-    if (espaciado < 30) espaciado = 30;
-    
-    // Rectángulo del nodo
-    cairo_set_source_rgb(cr, 0, 0.5, 0.8);
-    cairo_set_line_width(cr, 1);
-    cairo_rectangle(cr, x - 25, y - 12, 50, 24);
-    cairo_stroke(cr);
-    
-    // Texto del punto
-    char texto[32];
-    sprintf(texto, "(%d,%d)", R->P.x, R->P.y);
-    cairo_set_source_rgb(cr, 0, 0, 0);
-    cairo_set_font_size(cr, 10);
-    cairo_move_to(cr, x - 30, y + 4);
-    cairo_show_text(cr, texto);
-    
-    int dy = 55;
-    
-    // Hijo izquierdo
-    if (R->Izq != NULL) {
-        int xIzq = x - espaciado;
-        int yIzq = y + dy;
-        cairo_set_source_rgb(cr, 0, 0, 0);
-        cairo_set_line_width(cr, 1);
-        cairo_move_to(cr, x, y + 12);
-        cairo_line_to(cr, xIzq, yIzq - 12);
-        cairo_stroke(cr);
-        DibujarArbolVisual(cr, R->Izq, xIzq, yIzq, nivel + 1, maxNivel);
-    }
-    
-    // Hijo derecho
-    if (R->Der != NULL) {
-        int xDer = x + espaciado;
-        int yDer = y + dy;
-        cairo_set_source_rgb(cr, 0, 0, 0);
-        cairo_set_line_width(cr, 1);
-        cairo_move_to(cr, x, y + 12);
-        cairo_line_to(cr, xDer, yDer - 12);
-        cairo_stroke(cr);
-        DibujarArbolVisual(cr, R->Der, xDer, yDer, nivel + 1, maxNivel);
-    }
-}
+#include "kdtree.h"
+#include "drawing.h"
 
 // =============================================================================
 // Variables globales
@@ -227,15 +61,30 @@ static gboolean dibujar_arbol(GtkWidget *widget, cairo_t *cr, gpointer data) {
     // Ajustar tamaño del drawing area
     gtk_widget_set_size_request(widget, ancho, alturaDrawing);
     
-    // Obtener el área visible del scrolled window
-    GtkAllocation alloc;
-    gtk_widget_get_allocation(widget, &alloc);
+    // Forzar actualización del widget
+    gtk_widget_size_allocate(widget, &(GtkAllocation){0, 0, ancho, alturaDrawing});
+    
+    // Obtener el scrolled window padre
+    GtkWidget *parent = gtk_widget_get_parent(widget);
+    if (parent && GTK_IS_SCROLLED_WINDOW(parent)) {
+        // Obtener adjustments
+        GtkAdjustment *hadj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(parent));
+        GtkAdjustment *vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(parent));
+        
+        // Calcular posición para centrar
+        gdouble max_h = gtk_adjustment_get_upper(hadj) - gtk_adjustment_get_page_size(hadj);
+        gdouble max_v = gtk_adjustment_get_upper(vadj) - gtk_adjustment_get_page_size(vadj);
+        
+        // Posicionar al centro
+        gtk_adjustment_set_value(hadj, max_h / 2);
+        gtk_adjustment_set_value(vadj, max_v / 2);
+    }
     
     // Calcular altura del árbol para pasar como nivel máximo
     int alturaArbol = AlturaArbol(Arbol.Raiz);
     
     // Dibujar desde el centro del área visible, nivel 0
-    DibujarArbolVisual(cr, Arbol.Raiz, alloc.width / 2, 40, 0, alturaArbol);
+    DibujarArbolVisual(cr, Arbol.Raiz, ancho / 2, 40, 0, alturaArbol);
     
     return FALSE;
 }
