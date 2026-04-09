@@ -1,5 +1,5 @@
 // =============================================================================
-// KD-Tree Header - Estructuras y funciones del KD-Tree
+// KD-Tree - Estructura y funciones básicas
 // =============================================================================
 
 #ifndef KD_TREE_H
@@ -8,30 +8,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// =============================================================================
-// Estructuras del KD-Tree
-// =============================================================================
+// Punto en 2D
 typedef struct {
     int x, y;
 } Punto;
 
+// Nodo del árbol
 typedef struct Nodo {
     Punto P;
-    int eje;
+    int eje;  // 0 = divide por X, 1 = divide por Y
     struct Nodo *Izq, *Der;
 } Nodo;
 
+// ÁrbolKD-Tree
 typedef struct {
     Nodo *Raiz;
     int cantidad;
 } KDTree;
 
-// =============================================================================
-// Funciones del KD-Tree
-// =============================================================================
+// Funciones
 void Inicializar(KDTree *A);
-void Ins(Punto PP, Nodo **R, int e);
 void Insertar(KDTree *A, Punto PP);
 void LiberarArbol(Nodo *R);
 
-#endif // KD_TREE_H
+#endif

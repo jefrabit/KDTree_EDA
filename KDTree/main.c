@@ -1,23 +1,17 @@
 // =============================================================================
-// KD-Tree Visualizador - GTK C (Versión modular)
+// KD-Tree Visualizador - GTK
 // =============================================================================
 
 #include <gtk/gtk.h>
 #include <time.h>
 #include "kdtree.h"
-#include "drawing.h"
+#include "dibujo.h"
 
-// =============================================================================
-// Variables globales
-// =============================================================================
 KDTree Arbol;
 int pxi = 0, pyi = 0, pxf = 400, pyf = 400;
 
-// =============================================================================
-// Callbacks
-// =============================================================================
+// Dibuja puntos y líneas de división en el panel izquierdo
 static gboolean dibujar_puntos(GtkWidget *widget, cairo_t *cr, gpointer data) {
-    // Fondo blanco
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
     
@@ -27,12 +21,12 @@ static gboolean dibujar_puntos(GtkWidget *widget, cairo_t *cr, gpointer data) {
     cairo_rectangle(cr, pxi, pyi, pxf - pxi, pyf - pyi);
     cairo_stroke(cr);
     
-    // Dibujar árbol
     DibujarNodo(cr, pxi, pyi, pxf, pyf, Arbol.Raiz);
     
     return FALSE;
 }
 
+// Dibuja estructura del árbol en el panel derecho
 static gboolean dibujar_arbol(GtkWidget *widget, cairo_t *cr, gpointer data) {
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
@@ -45,50 +39,33 @@ static gboolean dibujar_arbol(GtkWidget *widget, cairo_t *cr, gpointer data) {
         return FALSE;
     }
     
-    // Calcular tamaño necesario del árbol según altura
+    // Calcular tamaño del lienzo
     int altura = AlturaArbol(Arbol.Raiz);
-    int ancho = 200; // Base
-    for (int i = 0; i < altura; i++) {
-        int espaciado = 180 >> i;
-        if (espaciado < 30) espaciado = 30;
-        ancho += espaciado * 2;
-    }
-    if (ancho < 600) ancho = 600;
+    int minX = 1000000, maxX = -1000000;
+    LimitesArbol(Arbol.Raiz, 0, 0, &minX, &maxX);
     
-    int alturaDrawing = altura * 70 + 100;
-    if (alturaDrawing < 400) alturaDrawing = 400;
-    
-    // Ajustar tamaño del drawing area
-    gtk_widget_set_size_request(widget, ancho, alturaDrawing);
-    
-    // Forzar actualización del widget
-    gtk_widget_size_allocate(widget, &(GtkAllocation){0, 0, ancho, alturaDrawing});
-    
-    // Obtener el scrolled window padre
-    GtkWidget *parent = gtk_widget_get_parent(widget);
-    if (parent && GTK_IS_SCROLLED_WINDOW(parent)) {
-        // Obtener adjustments
-        GtkAdjustment *hadj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(parent));
-        GtkAdjustment *vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(parent));
-        
-        // Calcular posición para centrar
-        gdouble max_h = gtk_adjustment_get_upper(hadj) - gtk_adjustment_get_page_size(hadj);
-        gdouble max_v = gtk_adjustment_get_upper(vadj) - gtk_adjustment_get_page_size(vadj);
-        
-        // Posicionar al centro
-        gtk_adjustment_set_value(hadj, max_h / 2);
-        gtk_adjustment_set_value(vadj, max_v / 2);
+    if (minX == 1000000) {
+        minX = 0;
+        maxX = 600;
     }
     
-    // Calcular altura del árbol para pasar como nivel máximo
-    int alturaArbol = AlturaArbol(Arbol.Raiz);
+    int ancho = (maxX - minX) + 400;
+    if (ancho < 800) ancho = 800;
     
-    // Dibujar desde el centro del área visible, nivel 0
-    DibujarArbolVisual(cr, Arbol.Raiz, ancho / 2, 40, 0, alturaArbol);
+    int alturaDibujo = altura * 60 + 150;
+    if (alturaDibujo < 500) alturaDibujo = 500;
+    
+    int inicioX = 150 - minX;
+    
+    gtk_widget_set_size_request(widget, ancho, alturaDibujo);
+    gtk_widget_size_allocate(widget, &(GtkAllocation){0, 0, ancho, alturaDibujo});
+    
+    DibujarArbolVisual(cr, Arbol.Raiz, inicioX, 40, 0, altura);
     
     return FALSE;
 }
 
+// Click para agregar punto
 static gboolean evento_click(GtkWidget *widget, GdkEventButton *event, gpointer data) {
     GtkWidget *da1 = GTK_WIDGET(data);
     GtkWidget *da2 = g_object_get_data(G_OBJECT(data), "da2");
@@ -111,6 +88,7 @@ static gboolean evento_click(GtkWidget *widget, GdkEventButton *event, gpointer 
     return TRUE;
 }
 
+// Movimiento del mouse
 static gboolean evento_mover(GtkWidget *widget, GdkEventMotion *event, gpointer data) {
     GtkLabel *labelCoords = GTK_LABEL(data);
     char buffer[64];
@@ -119,6 +97,7 @@ static gboolean evento_mover(GtkWidget *widget, GdkEventMotion *event, gpointer 
     return TRUE;
 }
 
+// Generar puntos aleatorios
 static void generar_aleatorios(GtkWidget *widget, gpointer data) {
     GtkWidget *da1 = g_object_get_data(G_OBJECT(data), "da1");
     GtkWidget *da2 = g_object_get_data(G_OBJECT(data), "da2");
@@ -138,6 +117,7 @@ static void generar_aleatorios(GtkWidget *widget, gpointer data) {
     gtk_widget_queue_draw(da2);
 }
 
+// Limpiar árbol
 static void limpiar_arbol(GtkWidget *widget, gpointer data) {
     GtkWidget *da1 = g_object_get_data(G_OBJECT(data), "da1");
     GtkWidget *da2 = g_object_get_data(G_OBJECT(data), "da2");
@@ -149,30 +129,27 @@ static void limpiar_arbol(GtkWidget *widget, gpointer data) {
     gtk_widget_queue_draw(da2);
 }
 
-// =============================================================================
-// Main
-// =============================================================================
 int main(int argc, char *argv[]) {
     gtk_init(&argc, &argv);
     
     Inicializar(&Arbol);
     
-    // Ventana
+    // Ventana principal
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "KD-Tree Visualizador");
     gtk_window_set_default_size(GTK_WINDOW(window), 800, 500);
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
     
-    // Contenedores
-    GtkWidget *hbox = gtk_hbox_new(FALSE, 10);
+    // Contenedor horizontal
+    GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     gtk_container_add(GTK_CONTAINER(window), hbox);
     
     // Panel izquierdo
-    GtkWidget *vboxIzq = gtk_vbox_new(FALSE, 5);
+    GtkWidget *vboxIzq = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(hbox), vboxIzq, TRUE, TRUE, 10);
     
     GtkWidget *labelCoords = gtk_label_new("Coordenadas: (0, 0)");
-    gtk_misc_set_alignment(GTK_MISC(labelCoords), 0, 0.5);
+    gtk_widget_set_halign(labelCoords, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(vboxIzq), labelCoords, FALSE, FALSE, 0);
     
     GtkWidget *drawingarea1 = gtk_drawing_area_new();
@@ -180,7 +157,7 @@ int main(int argc, char *argv[]) {
     gtk_box_pack_start(GTK_BOX(vboxIzq), drawingarea1, TRUE, TRUE, 0);
     
     // Panel derecho
-    GtkWidget *vboxDer = gtk_vbox_new(FALSE, 5);
+    GtkWidget *vboxDer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(hbox), vboxDer, TRUE, TRUE, 10);
     
     gtk_box_pack_start(GTK_BOX(vboxDer), gtk_label_new("Estructura del Arbol"), FALSE, FALSE, 0);
@@ -191,16 +168,13 @@ int main(int argc, char *argv[]) {
     GtkWidget *btnLimpiar = gtk_button_new_with_label("Limpiar");
     gtk_box_pack_start(GTK_BOX(vboxDer), btnLimpiar, FALSE, FALSE, 0);
     
-    // ScrolledWindow para el árbol (horizontal scrollable)
+    // ScrolledWindow para el árbol
     GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled), GTK_POLICY_ALWAYS, GTK_POLICY_ALWAYS);
-    gtk_scrolled_window_set_min_content_width(GTK_SCROLLED_WINDOW(scrolled), 500);
-    gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scrolled), 400);
     gtk_box_pack_start(GTK_BOX(vboxDer), scrolled, TRUE, TRUE, 0);
     
-    // Drawing area más grande para permitir scrolling
     GtkWidget *drawingarea2 = gtk_drawing_area_new();
-    gtk_widget_set_size_request(drawingarea2, 2000, 1500);
+    gtk_widget_set_size_request(drawingarea2, 800, 500);
     gtk_container_add(GTK_CONTAINER(scrolled), drawingarea2);
     
     // Datos para callbacks

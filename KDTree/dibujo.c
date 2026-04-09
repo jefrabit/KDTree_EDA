@@ -1,22 +1,17 @@
 // =============================================================================
-// Drawing Implementation - Funciones de dibujo del KD-Tree
+// Funciones de dibujo del KD-Tree
 // =============================================================================
 
-#include "drawing.h"
+#include "dibujo.h"
 
-// =============================================================================
-// Funciones aux para calcular dimensiones del árbol
-// =============================================================================
+// Ancho del subárbol
 int AnchoSubtree(Nodo *n) {
     if (n == NULL) return 0;
-    if (n->Izq == NULL && n->Der == NULL) return 60;
-    
-    int izq = AnchoSubtree(n->Izq);
-    int der = AnchoSubtree(n->Der);
-    
-    return izq + der + 60;
+    if (n->Izq == NULL && n->Der == NULL) return 80;
+    return AnchoSubtree(n->Izq) + AnchoSubtree(n->Der) + 80;
 }
 
+// Altura del árbol
 int AlturaArbol(Nodo *n) {
     if (n == NULL) return 0;
     int izq = AlturaArbol(n->Izq);
@@ -24,19 +19,32 @@ int AlturaArbol(Nodo *n) {
     return 1 + (izq > der ? izq : der);
 }
 
-// =============================================================================
-// Funciones de dibujo
-// =============================================================================
+// Límites izquierdo y derecho
+void LimitesArbol(Nodo *n, int x, int nivel, int *minX, int *maxX) {
+    if (n == NULL) return;
+    if (x < *minX) *minX = x;
+    if (x > *maxX) *maxX = x;
+    
+    int esp = 50;
+    int aIzq = AnchoSubtree(n->Izq);
+    int aDer = AnchoSubtree(n->Der);
+    if (aIzq > 0 || aDer > 0) esp = (aIzq > aDer ? aIzq : aDer) + 20;
+    if (esp < 50) esp = 50;
+    
+    LimitesArbol(n->Izq, x - esp, nivel + 1, minX, maxX);
+    LimitesArbol(n->Der, x + esp, nivel + 1, minX, maxX);
+}
+
+// Dibuja líneas de división en el plano
 void DibujarNodo(cairo_t *cr, int xi, int yi, int xf, int yf, Nodo *R) {
     if (R == NULL) return;
     
     int xx = R->P.x;
     int yy = R->P.y;
     
-    // Línea divisora
+    // Línea divisora (azul)
     cairo_set_source_rgb(cr, 0.2, 0.4, 1);
     cairo_set_line_width(cr, 1);
-    
     if (R->eje == 1) {
         cairo_move_to(cr, xi, yy);
         cairo_line_to(cr, xf, yy);
@@ -46,7 +54,7 @@ void DibujarNodo(cairo_t *cr, int xi, int yi, int xf, int yf, Nodo *R) {
     }
     cairo_stroke(cr);
     
-    // Punto
+    // Punto (rojo)
     cairo_set_source_rgb(cr, 1, 0, 0);
     cairo_arc(cr, xx, yy, 4, 0, 2 * G_PI);
     cairo_fill(cr);
@@ -61,49 +69,52 @@ void DibujarNodo(cairo_t *cr, int xi, int yi, int xf, int yf, Nodo *R) {
     }
 }
 
+// Dibuja estructura jerárquica del árbol
 void DibujarArbolVisual(cairo_t *cr, Nodo *R, int x, int y, int nivel, int maxNivel) {
     if (R == NULL) return;
     
-    // El espaciado se reduce en cada nivel (factor de 2)
-    int espaciado = 180 >> nivel;
-    if (espaciado < 30) espaciado = 30;
+    int aIzq = AnchoSubtree(R->Izq);
+    int aDer = AnchoSubtree(R->Der);
+    int esp = 50;
+    if (aIzq > 0 || aDer > 0) esp = (aIzq > aDer ? aIzq : aDer) + 20;
+    if (esp < 50) esp = 50;
     
-    // Rectángulo del nodo
+    // Nodo
     cairo_set_source_rgb(cr, 0, 0.5, 0.8);
     cairo_set_line_width(cr, 1);
-    cairo_rectangle(cr, x - 25, y - 12, 50, 24);
+    cairo_rectangle(cr, x - 15, y - 8, 30, 16);
     cairo_stroke(cr);
     
-    // Texto del punto
-    char texto[32];
-    sprintf(texto, "(%d,%d)", R->P.x, R->P.y);
+    // Texto
+    char txt[32];
+    sprintf(txt, "(%d,%d)", R->P.x, R->P.y);
     cairo_set_source_rgb(cr, 0, 0, 0);
-    cairo_set_font_size(cr, 10);
-    cairo_move_to(cr, x - 30, y + 4);
-    cairo_show_text(cr, texto);
+    cairo_set_font_size(cr, 8);
+    cairo_move_to(cr, x - 18, y + 3);
+    cairo_show_text(cr, txt);
     
-    int dy = 55;
+    int dy = 50;
     
     // Hijo izquierdo
     if (R->Izq != NULL) {
-        int xIzq = x - espaciado;
+        int xIzq = x - esp;
         int yIzq = y + dy;
         cairo_set_source_rgb(cr, 0, 0, 0);
         cairo_set_line_width(cr, 1);
-        cairo_move_to(cr, x, y + 12);
-        cairo_line_to(cr, xIzq, yIzq - 12);
+        cairo_move_to(cr, x, y + 8);
+        cairo_line_to(cr, xIzq, yIzq - 8);
         cairo_stroke(cr);
         DibujarArbolVisual(cr, R->Izq, xIzq, yIzq, nivel + 1, maxNivel);
     }
     
     // Hijo derecho
     if (R->Der != NULL) {
-        int xDer = x + espaciado;
+        int xDer = x + esp;
         int yDer = y + dy;
         cairo_set_source_rgb(cr, 0, 0, 0);
         cairo_set_line_width(cr, 1);
-        cairo_move_to(cr, x, y + 12);
-        cairo_line_to(cr, xDer, yDer - 12);
+        cairo_move_to(cr, x, y + 8);
+        cairo_line_to(cr, xDer, yDer - 8);
         cairo_stroke(cr);
         DibujarArbolVisual(cr, R->Der, xDer, yDer, nivel + 1, maxNivel);
     }
