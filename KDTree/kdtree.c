@@ -1,49 +1,41 @@
-// =============================================================================
-// Implementación del KD-Tree
-// =============================================================================
-
 #include "kdtree.h"
 
-// Inicializa el árbol vacío
-void Inicializar(KDTree *A) {
-    A->Raiz = NULL;
-    A->cantidad = 0;
+void Inicializar(KDTree *a) {
+    a->raiz = NULL;
+    a->cantidad = 0;
 }
 
-// Inserta un punto en el árbol
-void Ins(Punto PP, Nodo **R, int e) {
-    if (*R == NULL) {
-        *R = (Nodo *)malloc(sizeof(Nodo));
-        if (*R == NULL) return;
-        (*R)->P = PP;
-        (*R)->eje = e;
-        (*R)->Izq = NULL;
-        (*R)->Der = NULL;
+void Ins(Punto p, Nodo **r, int e) {
+    if (*r == NULL) {
+        *r = (Nodo *)malloc(sizeof(Nodo));
+        if (*r == NULL) return;
+        (*r)->p = p;
+        (*r)->eje = e;
+        (*r)->izq = NULL;
+        (*r)->der = NULL;
     } else {
-        if ((*R)->eje == 0) {
-            if (PP.x <= (*R)->P.x)
-                Ins(PP, &(*R)->Izq, 1);
+        if ((*r)->eje == 0) {
+            if (p.x <= (*r)->p.x)
+                Ins(p, &(*r)->izq, 1);
             else
-                Ins(PP, &(*R)->Der, 1);
+                Ins(p, &(*r)->der, 1);
         } else {
-            if (PP.y <= (*R)->P.y)
-                Ins(PP, &(*R)->Izq, 0);
+            if (p.y <= (*r)->p.y)
+                Ins(p, &(*r)->izq, 0);
             else
-                Ins(PP, &(*R)->Der, 0);
+                Ins(p, &(*r)->der, 0);
         }
     }
 }
 
-// Wrapper para insertar
-void Insertar(KDTree *A, Punto PP) {
-    Ins(PP, &A->Raiz, 0);
-    A->cantidad++;
+void Insertar(KDTree *a, Punto p) {
+    Ins(p, &a->raiz, 0);
+    a->cantidad++;
 }
 
-// Libera memoria del árbol
-void LiberarArbol(Nodo *R) {
-    if (R == NULL) return;
-    LiberarArbol(R->Izq);
-    LiberarArbol(R->Der);
-    free(R);
+void Liberar(Nodo *r) {
+    if (r == NULL) return;
+    Liberar(r->izq);
+    Liberar(r->der);
+    free(r);
 }

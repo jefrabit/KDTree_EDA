@@ -1,202 +1,172 @@
-// =============================================================================
-// KD-Tree Visualizador - GTK
-// =============================================================================
-
 #include <gtk/gtk.h>
 #include <time.h>
 #include "kdtree.h"
 #include "dibujo.h"
 
-KDTree Arbol;
+KDTree arb;
 int pxi = 0, pyi = 0, pxf = 400, pyf = 400;
 
-// Dibuja puntos y líneas de división en el panel izquierdo
-static gboolean dibujar_puntos(GtkWidget *widget, cairo_t *cr, gpointer data) {
+static gboolean dibujar(GtkWidget *w, cairo_t *cr, gpointer d) {
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
     
-    // Borde
     cairo_set_source_rgb(cr, 0, 0, 0);
     cairo_set_line_width(cr, 2);
     cairo_rectangle(cr, pxi, pyi, pxf - pxi, pyf - pyi);
     cairo_stroke(cr);
     
-    DibujarNodo(cr, pxi, pyi, pxf, pyf, Arbol.Raiz);
-    
+    Dibujar(arb.raiz, cr, pxi, pyi, pxf, pyf);
     return FALSE;
 }
 
-// Dibuja estructura del árbol en el panel derecho
-static gboolean dibujar_arbol(GtkWidget *widget, cairo_t *cr, gpointer data) {
+static gboolean dibujar2(GtkWidget *w, cairo_t *cr, gpointer d) {
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
     
-    if (Arbol.Raiz == NULL) {
+    if (arb.raiz == NULL) {
         cairo_set_source_rgb(cr, 0.5, 0.5, 0.5);
         cairo_set_font_size(cr, 16);
         cairo_move_to(cr, 100, 150);
-        cairo_show_text(cr, "Arbol vacio");
+        cairo_show_text(cr, "Vacio");
         return FALSE;
     }
     
-    // Calcular tamaño del lienzo
-    int altura = AlturaArbol(Arbol.Raiz);
+    int alt = Altura(arb.raiz);
     int minX = 1000000, maxX = -1000000;
-    LimitesArbol(Arbol.Raiz, 0, 0, &minX, &maxX);
+    Limites(arb.raiz, 0, 0, &minX, &maxX);
     
-    if (minX == 1000000) {
-        minX = 0;
-        maxX = 600;
-    }
+    if (minX == 1000000) { minX = 0; maxX = 600; }
     
     int ancho = (maxX - minX) + 400;
     if (ancho < 800) ancho = 800;
+    int alto = alt * 60 + 150;
+    if (alto < 500) alto = 500;
     
-    int alturaDibujo = altura * 60 + 150;
-    if (alturaDibujo < 500) alturaDibujo = 500;
+    int iniX = 150 - minX;
     
-    int inicioX = 150 - minX;
+    gtk_widget_set_size_request(w, ancho, alto);
+    gtk_widget_size_allocate(w, &(GtkAllocation){0, 0, ancho, alto});
     
-    gtk_widget_set_size_request(widget, ancho, alturaDibujo);
-    gtk_widget_size_allocate(widget, &(GtkAllocation){0, 0, ancho, alturaDibujo});
-    
-    DibujarArbolVisual(cr, Arbol.Raiz, inicioX, 40, 0, altura);
+    DibujarArbol(arb.raiz, cr, iniX, 40, 0);
     
     return FALSE;
 }
 
-// Click para agregar punto
-static gboolean evento_click(GtkWidget *widget, GdkEventButton *event, gpointer data) {
-    GtkWidget *da1 = GTK_WIDGET(data);
-    GtkWidget *da2 = g_object_get_data(G_OBJECT(data), "da2");
-    GtkLabel *labelCoords = g_object_get_data(G_OBJECT(data), "labelCoords");
+static gboolean click(GtkWidget *w, GdkEventButton *e, gpointer d) {
+    GtkWidget *d1 = GTK_WIDGET(d);
+    GtkWidget *d2 = g_object_get_data(G_OBJECT(d), "d2");
+    GtkLabel *lbl = g_object_get_data(G_OBJECT(d), "lbl");
     
-    int x = (int)event->x;
-    int y = (int)event->y;
+    int x = (int)e->x;
+    int y = (int)e->y;
     
-    char buffer[64];
-    sprintf(buffer, "Coordenadas: (%d, %d)", x, y);
-    gtk_label_set_text(labelCoords, buffer);
+    char buf[64];
+    sprintf(buf, "Coords: (%d, %d)", x, y);
+    gtk_label_set_text(lbl, buf);
     
     if (x < pxf && x > pxi && y < pyf && y > pyi) {
         Punto p = {x, y};
-        Insertar(&Arbol, p);
-        gtk_widget_queue_draw(da1);
-        gtk_widget_queue_draw(da2);
+        Insertar(&arb, p);
+        gtk_widget_queue_draw(d1);
+        gtk_widget_queue_draw(d2);
     }
-    
     return TRUE;
 }
 
-// Movimiento del mouse
-static gboolean evento_mover(GtkWidget *widget, GdkEventMotion *event, gpointer data) {
-    GtkLabel *labelCoords = GTK_LABEL(data);
-    char buffer[64];
-    sprintf(buffer, "Coordenadas: (%d, %d)", (int)event->x, (int)event->y);
-    gtk_label_set_text(labelCoords, buffer);
+static gboolean mover(GtkWidget *w, GdkEventMotion *e, gpointer d) {
+    GtkLabel *lbl = GTK_LABEL(d);
+    char buf[64];
+    sprintf(buf, "Coords: (%d, %d)", (int)e->x, (int)e->y);
+    gtk_label_set_text(lbl, buf);
     return TRUE;
 }
 
-// Generar puntos aleatorios
-static void generar_aleatorios(GtkWidget *widget, gpointer data) {
-    GtkWidget *da1 = g_object_get_data(G_OBJECT(data), "da1");
-    GtkWidget *da2 = g_object_get_data(G_OBJECT(data), "da2");
+static void gen_aleat(GtkWidget *w, gpointer d) {
+    GtkWidget *d1 = g_object_get_data(G_OBJECT(d), "d1");
+    GtkWidget *d2 = g_object_get_data(G_OBJECT(d), "d2");
     
-    LiberarArbol(Arbol.Raiz);
-    Inicializar(&Arbol);
+    Liberar(arb.raiz);
+    Inicializar(&arb);
     
     srand(time(NULL));
     for (int i = 0; i < 10; i++) {
         int x = pxi + 10 + rand() % (pxf - pxi - 20);
         int y = pyi + 10 + rand() % (pyf - pyi - 20);
         Punto p = {x, y};
-        Insertar(&Arbol, p);
+        Insertar(&arb, p);
     }
-    
-    gtk_widget_queue_draw(da1);
-    gtk_widget_queue_draw(da2);
+    gtk_widget_queue_draw(d1);
+    gtk_widget_queue_draw(d2);
 }
 
-// Limpiar árbol
-static void limpiar_arbol(GtkWidget *widget, gpointer data) {
-    GtkWidget *da1 = g_object_get_data(G_OBJECT(data), "da1");
-    GtkWidget *da2 = g_object_get_data(G_OBJECT(data), "da2");
-    
-    LiberarArbol(Arbol.Raiz);
-    Inicializar(&Arbol);
-    
-    gtk_widget_queue_draw(da1);
-    gtk_widget_queue_draw(da2);
+static void limpiar(GtkWidget *w, gpointer d) {
+    GtkWidget *d1 = g_object_get_data(G_OBJECT(d), "d1");
+    GtkWidget *d2 = g_object_get_data(G_OBJECT(d), "d2");
+    Liberar(arb.raiz);
+    Inicializar(&arb);
+    gtk_widget_queue_draw(d1);
+    gtk_widget_queue_draw(d2);
 }
 
 int main(int argc, char *argv[]) {
     gtk_init(&argc, &argv);
+    Inicializar(&arb);
     
-    Inicializar(&Arbol);
+    GtkWidget *win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(win), "KD-Tree 2D");
+    gtk_window_set_default_size(GTK_WINDOW(win), 800, 500);
+    g_signal_connect(win, "destroy", G_CALLBACK(gtk_main_quit), NULL);
     
-    // Ventana principal
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "KD-Tree Visualizador");
-    gtk_window_set_default_size(GTK_WINDOW(window), 800, 500);
-    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
-    
-    // Contenedor horizontal
     GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-    gtk_container_add(GTK_CONTAINER(window), hbox);
+    gtk_container_add(GTK_CONTAINER(win), hbox);
     
-    // Panel izquierdo
-    GtkWidget *vboxIzq = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    gtk_box_pack_start(GTK_BOX(hbox), vboxIzq, TRUE, TRUE, 10);
+    GtkWidget *vbox1 = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    gtk_box_pack_start(GTK_BOX(hbox), vbox1, TRUE, TRUE, 10);
     
-    GtkWidget *labelCoords = gtk_label_new("Coordenadas: (0, 0)");
-    gtk_widget_set_halign(labelCoords, GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(vboxIzq), labelCoords, FALSE, FALSE, 0);
+    GtkWidget *lbl = gtk_label_new("Coords: (0, 0)");
+    gtk_widget_set_halign(lbl, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(vbox1), lbl, FALSE, FALSE, 0);
     
-    GtkWidget *drawingarea1 = gtk_drawing_area_new();
-    gtk_widget_set_size_request(drawingarea1, 400, 400);
-    gtk_box_pack_start(GTK_BOX(vboxIzq), drawingarea1, TRUE, TRUE, 0);
+    GtkWidget *area1 = gtk_drawing_area_new();
+    gtk_widget_set_size_request(area1, 400, 400);
+    gtk_box_pack_start(GTK_BOX(vbox1), area1, TRUE, TRUE, 0);
     
-    // Panel derecho
-    GtkWidget *vboxDer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    gtk_box_pack_start(GTK_BOX(hbox), vboxDer, TRUE, TRUE, 10);
+    GtkWidget *vbox2 = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    gtk_box_pack_start(GTK_BOX(hbox), vbox2, TRUE, TRUE, 10);
     
-    gtk_box_pack_start(GTK_BOX(vboxDer), gtk_label_new("Estructura del Arbol"), FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox2), gtk_label_new("Estructura"), FALSE, FALSE, 0);
     
-    GtkWidget *btnRandom = gtk_button_new_with_label("Generar 10 puntos");
-    gtk_box_pack_start(GTK_BOX(vboxDer), btnRandom, FALSE, FALSE, 0);
+    GtkWidget *btn1 = gtk_button_new_with_label("Aleatorio");
+    gtk_box_pack_start(GTK_BOX(vbox2), btn1, FALSE, FALSE, 0);
     
-    GtkWidget *btnLimpiar = gtk_button_new_with_label("Limpiar");
-    gtk_box_pack_start(GTK_BOX(vboxDer), btnLimpiar, FALSE, FALSE, 0);
+    GtkWidget *btn2 = gtk_button_new_with_label("Limpiar");
+    gtk_box_pack_start(GTK_BOX(vbox2), btn2, FALSE, FALSE, 0);
     
-    // ScrolledWindow para el árbol
-    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled), GTK_POLICY_ALWAYS, GTK_POLICY_ALWAYS);
-    gtk_box_pack_start(GTK_BOX(vboxDer), scrolled, TRUE, TRUE, 0);
+    GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_ALWAYS, GTK_POLICY_ALWAYS);
+    gtk_box_pack_start(GTK_BOX(vbox2), scroll, TRUE, TRUE, 0);
     
-    GtkWidget *drawingarea2 = gtk_drawing_area_new();
-    gtk_widget_set_size_request(drawingarea2, 800, 500);
-    gtk_container_add(GTK_CONTAINER(scrolled), drawingarea2);
+    GtkWidget *area2 = gtk_drawing_area_new();
+    gtk_widget_set_size_request(area2, 800, 500);
+    gtk_container_add(GTK_CONTAINER(scroll), area2);
     
-    // Datos para callbacks
-    g_object_set_data(G_OBJECT(drawingarea1), "da2", drawingarea2);
-    g_object_set_data(G_OBJECT(drawingarea1), "labelCoords", labelCoords);
-    g_object_set_data(G_OBJECT(btnRandom), "da1", drawingarea1);
-    g_object_set_data(G_OBJECT(btnRandom), "da2", drawingarea2);
-    g_object_set_data(G_OBJECT(btnLimpiar), "da1", drawingarea1);
-    g_object_set_data(G_OBJECT(btnLimpiar), "da2", drawingarea2);
+    g_object_set_data(G_OBJECT(area1), "d2", area2);
+    g_object_set_data(G_OBJECT(area1), "lbl", lbl);
+    g_object_set_data(G_OBJECT(btn1), "d1", area1);
+    g_object_set_data(G_OBJECT(btn1), "d2", area2);
+    g_object_set_data(G_OBJECT(btn2), "d1", area1);
+    g_object_set_data(G_OBJECT(btn2), "d2", area2);
     
-    // Señales
-    g_signal_connect(drawingarea1, "draw", G_CALLBACK(dibujar_puntos), NULL);
-    g_signal_connect(drawingarea2, "draw", G_CALLBACK(dibujar_arbol), NULL);
-    g_signal_connect(drawingarea1, "button-press-event", G_CALLBACK(evento_click), drawingarea1);
-    g_signal_connect(drawingarea1, "motion-notify-event", G_CALLBACK(evento_mover), labelCoords);
-    g_signal_connect(btnRandom, "clicked", G_CALLBACK(generar_aleatorios), btnRandom);
-    g_signal_connect(btnLimpiar, "clicked", G_CALLBACK(limpiar_arbol), btnLimpiar);
+    g_signal_connect(area1, "draw", G_CALLBACK(dibujar), NULL);
+    g_signal_connect(area2, "draw", G_CALLBACK(dibujar2), NULL);
+    g_signal_connect(area1, "button-press-event", G_CALLBACK(click), area1);
+    g_signal_connect(area1, "motion-notify-event", G_CALLBACK(mover), lbl);
+    g_signal_connect(btn1, "clicked", G_CALLBACK(gen_aleat), btn1);
+    g_signal_connect(btn2, "clicked", G_CALLBACK(limpiar), btn2);
     
-    gtk_widget_set_events(drawingarea1, GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK);
+    gtk_widget_set_events(area1, GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK);
     
-    gtk_widget_show_all(window);
+    gtk_widget_show_all(win);
     gtk_main();
-    
     return 0;
 }
